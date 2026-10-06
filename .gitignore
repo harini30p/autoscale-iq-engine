@@ -22,8 +22,25 @@ dist/
 build/
 .next/
 
+# ML & Datasets
+# ML & Datasets
+ml/data/
+*.tar.xz
+*.tar.gz
+*.parquet
+*.joblib
+
+# Keep only the locked production ML artifacts
+!ml/artifacts/
+!ml/artifacts/model_5m_config6.joblib
+!ml/artifacts/calibrator_5m_config6_isotonic.joblib
+!ml/artifacts/thresholds_5m_config6.json
+
+
+
 # IDE & OS
 .vscode/
 .idea/
 .DS_Store
 Thumbs.db
+

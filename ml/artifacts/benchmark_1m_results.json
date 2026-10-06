@@ -1,0 +1,74 @@
+{
+  "train_rows": 1000000,
+  "train_pos": 90909,
+  "train_neg": 909091,
+  "train_pos_prev_pct": 9.0909,
+  "load_time_sec": 0.1951545998454094,
+  "fit_time_sec": 29.64193050004542,
+  "peak_ram_mb": 380.1267375946045,
+  "n_trees": 100,
+  "val_rows": 65531125,
+  "val_pos": 249847,
+  "pr_auc": 0.29233987342232326,
+  "roc_auc": 0.9728814332453862,
+  "precision": 0.12655556575963867,
+  "recall": 0.7832113253311026,
+  "f2": 0.38435384838997333,
+  "brier": 0.01393017265945673,
+  "infer_time_sec": 264.13785899989307,
+  "throughput_samples_sec": 248094.40512662946,
+  "calibration_report": {
+    "calibration_sample_size": 2000000,
+    "calibration_positives": 7691,
+    "calibration_negatives": 1992309,
+    "calibration_pos_prevalence_pct": 0.38455,
+    "raw_uncalibrated": {
+      "brier": 0.015643928200006485,
+      "pr_auc": 0.26524501148757473,
+      "mean_pred": 0.03987209498882294
+    },
+    "prior_shift_correction": {
+      "brier": 0.003215758548786802,
+      "pr_auc": 0.26524501148503127,
+      "mean_pred": 0.003762342395916322,
+      "delta_logit": -3.264991874202819
+    },
+    "platt_sigmoid": {
+      "brier": 0.003187464317306876,
+      "pr_auc": 0.26524501134978123,
+      "mean_pred": 0.003877491457387805
+    },
+    "isotonic": {
+      "brier": 0.0031284820288419724,
+      "pr_auc": 0.274997975726722,
+      "mean_pred": 0.0038455065805464983
+    }
+  },
+  "selected_calibrator": "isotonic",
+  "tau_watch": 0.045,
+  "tau_crit": 0.09,
+  "watch_metrics": {
+    "threshold": 0.04,
+    "precision": 0.13666449380735096,
+    "recall": 0.708750487582889,
+    "f2": 0.38577494692144376,
+    "tp": 5451,
+    "fp": 34435,
+    "fn": 2240,
+    "predicted_alerts": 39886,
+    "fa_per_func_day": 23.6740625,
+    "fa_per_1k_func_days": 23674.0625
+  },
+  "crit_metrics": {
+    "threshold": 0.09,
+    "precision": 0.23115410273515677,
+    "recall": 0.5406319074242621,
+    "f2": 0.42644404332129965,
+    "tp": 4158,
+    "fp": 13830,
+    "fn": 3533,
+    "predicted_alerts": 17988,
+    "fa_per_func_day": 9.508125,
+    "fa_per_1k_func_days": 9508.125
+  }
+}

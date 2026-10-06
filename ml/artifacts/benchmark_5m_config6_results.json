@@ -1,0 +1,63 @@
+{
+  "timestamp": "2026-10-06T14:01:09Z",
+  "model_architecture": {
+    "name": "HistGradientBoostingClassifier Config 6",
+    "max_leaf_nodes": 63,
+    "min_samples_leaf": 50,
+    "l2_regularization": 3.0,
+    "learning_rate": 0.1,
+    "max_iter": 100,
+    "early_stopping": true,
+    "n_iter_no_change": 10,
+    "random_state": 42,
+    "actual_iterations": 100
+  },
+  "training": {
+    "exact_rows": 5000000,
+    "positives": 454545,
+    "negatives": 4545455,
+    "positive_prevalence_pct": 9.0909,
+    "load_time_sec": 2.007743600057438,
+    "fit_time_sec": 174.81991940014996,
+    "peak_ram_mb": 1798.8252725601196
+  },
+  "validation_day09": {
+    "total_rows": 65531125,
+    "positives": 249847,
+    "natural_prevalence_pct": 0.3812646280679601,
+    "pr_auc": 0.32448264923417003,
+    "roc_auc": 0.9739521017754247,
+    "precision": 0.1337896731829636,
+    "recall": 0.7801014220703071,
+    "f2": 0.39676377749830327,
+    "brier": 0.013285980559885502,
+    "infer_time_sec": 389.67494619986974,
+    "throughput_samples_sec": 168168.6894142488
+  },
+  "comparisons": {
+    "baseline_5m": {
+      "pr_auc": 0.3034,
+      "roc_auc": 0.9731,
+      "precision": 0.1286,
+      "recall": 0.7809,
+      "f2": 0.3877,
+      "brier": 0.013731
+    },
+    "config6_1m": {
+      "pr_auc": 0.3137,
+      "roc_auc": 0.9735,
+      "precision": 0.1312,
+      "recall": 0.7817,
+      "f2": 0.3925,
+      "brier": 0.013491
+    },
+    "delta_over_5m_baseline": {
+      "absolute_pr_auc_gain": 0.02105064923417005,
+      "relative_pr_auc_gain_pct": 6.937517873582895
+    },
+    "delta_over_1m_config6": {
+      "absolute_pr_auc_gain": 0.010754649234170022,
+      "relative_pr_auc_gain_pct": 3.42801701925554
+    }
+  }
+}

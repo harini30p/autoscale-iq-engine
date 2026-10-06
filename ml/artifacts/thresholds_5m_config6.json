@@ -1,0 +1,40 @@
+{
+  "watch_threshold": 0.04,
+  "critical_threshold": 0.075,
+  "calibration_method": "isotonic",
+  "validation_day": "09",
+  "confirmation_count": 3,
+  "operating_metrics": {
+    "watch": {
+      "threshold": 0.04,
+      "recall": 0.710960863346769,
+      "precision": 0.14252945469711187,
+      "f2": 0.39549820622613124,
+      "tp": 5468,
+      "fp": 32896,
+      "fn": 2223,
+      "fa_per_func_day": 22.616,
+      "fa_per_1k_func_days": 22616.0
+    },
+    "critical_single": {
+      "threshold": 0.075,
+      "recall": 0.5805486932778572,
+      "precision": 0.22976380383883085,
+      "f2": 0.4447476940853039,
+      "tp": 4465,
+      "fp": 14968,
+      "fn": 3226,
+      "fa_per_func_day": 10.2905,
+      "fa_per_1k_func_days": 10290.5
+    },
+    "critical_3x_confirmed": {
+      "tp": 3328,
+      "fp": 8704,
+      "precision": 0.2765957446808511,
+      "recall": 0.43271356130542193,
+      "fa_per_func_day": 5.984,
+      "fa_per_1k_func_days": 5984.0,
+      "false_alarm_reduction_pct": 41.84927846071619
+    }
+  }
+}
