@@ -102,6 +102,24 @@ export async function predictSurge(payload) {
 }
 
 /**
+ * Retrieve recent metric telemetry history (GET /metrics/history).
+ * @param {number} limit
+ * @returns {Promise<Array<Object>>}
+ */
+export async function getMetricHistory(limit = 60) {
+  return fetchJson(`/metrics/history?limit=${limit}`);
+}
+
+/**
+ * Retrieve recent ML prediction history (GET /predictions/history).
+ * @param {number} limit
+ * @returns {Promise<Array<Object>>}
+ */
+export async function getPredictionHistory(limit = 60) {
+  return fetchJson(`/predictions/history?limit=${limit}`);
+}
+
+/**
  * Enable or disable manual safety override (POST /override).
  * @param {boolean} manualOverride
  * @returns {Promise<Object>}
@@ -114,3 +132,4 @@ export async function setManualOverride(manualOverride) {
 }
 
 export { API_BASE_URL };
+

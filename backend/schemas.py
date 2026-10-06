@@ -79,6 +79,30 @@ class SystemConfiguration(BaseModel):
     heavy_components: str = Field(default="enabled", description="Heavy component status ('enabled' or 'disabled')")
 
 
+class MetricRecordSchema(BaseModel):
+    """Stored telemetry observation record returned from history endpoints."""
+    id: Optional[int] = None
+    timestamp: datetime
+    traffic: float
+    active_users: int
+    cpu_utilization: float
+    memory_utilization: float
+    response_time: float
+    db_query_time: float
+    system_load: float
+
+
+class MLPredictionRecordSchema(BaseModel):
+    """Stored ML surge prediction record returned from history endpoints."""
+    id: Optional[int] = None
+    timestamp: datetime
+    probability: float = Field(..., description="Calibrated surge probability")
+    risk_signal: RiskSignal = Field(..., description="Classification from thresholds")
+    watch_threshold: float
+    critical_threshold: float
+    feature_snapshot: Optional[List[float]] = None
+
+
 class OptimizationEventSchema(BaseModel):
     id: Optional[int] = None
     timestamp: datetime

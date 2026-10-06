@@ -286,7 +286,7 @@ def get_recent_events(limit: int = 50, db_path: str = DEFAULT_DB_PATH) -> List[D
 
 
 def get_recent_metrics(limit: int = 50, db_path: str = DEFAULT_DB_PATH) -> List[Dict[str, Any]]:
-    """Retrieve recent recorded metrics ordered by latest first."""
+    """Retrieve recent recorded metrics ordered chronologically (oldest first)."""
     init_db(db_path)
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
@@ -298,7 +298,25 @@ def get_recent_metrics(limit: int = 50, db_path: str = DEFAULT_DB_PATH) -> List[
             LIMIT ?
         """, (limit,))
         rows = cursor.fetchall()
-        return [dict(r) for r in rows]
+        metrics = []
+        for r in reversed(rows):
+            ts = r["timestamp"]
+            try:
+                ts_dt = datetime.fromisoformat(ts)
+            except (ValueError, TypeError):
+                ts_dt = ts
+            metrics.append({
+                "id": r["id"],
+                "timestamp": ts_dt,
+                "traffic": r["traffic"],
+                "active_users": r["active_users"],
+                "cpu_utilization": r["cpu_utilization"],
+                "memory_utilization": r["memory_utilization"],
+                "response_time": r["response_time"],
+                "db_query_time": r["db_query_time"],
+                "system_load": r["system_load"],
+            })
+        return metrics
 
 
 def insert_ml_prediction(
@@ -336,7 +354,7 @@ def insert_ml_prediction(
 
 
 def get_recent_predictions(limit: int = 50, db_path: str = DEFAULT_DB_PATH) -> List[Dict[str, Any]]:
-    """Retrieve recent ML predictions ordered by latest first."""
+    """Retrieve recent ML predictions ordered chronologically (oldest first)."""
     init_db(db_path)
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
@@ -349,15 +367,20 @@ def get_recent_predictions(limit: int = 50, db_path: str = DEFAULT_DB_PATH) -> L
         """, (limit,))
         rows = cursor.fetchall()
         predictions = []
-        for r in rows:
+        for r in reversed(rows):
             snapshot = r["feature_snapshot"]
             try:
                 snapshot = json.loads(snapshot)
             except Exception:
                 pass
+            ts = r["timestamp"]
+            try:
+                ts_dt = datetime.fromisoformat(ts)
+            except (ValueError, TypeError):
+                ts_dt = ts
             predictions.append({
                 "id": r["id"],
-                "timestamp": datetime.fromisoformat(r["timestamp"]),
+                "timestamp": ts_dt,
                 "probability": r["probability"],
                 "risk_signal": r["risk_signal"],
                 "watch_threshold": r["watch_threshold"],

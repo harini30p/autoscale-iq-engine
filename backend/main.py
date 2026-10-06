@@ -26,13 +26,17 @@ from backend.database import (
     insert_metric,
     insert_ml_prediction,
     get_recent_events,
+    get_recent_metrics,
+    get_recent_predictions,
 )
 from backend.monitoring import assess_freshness
 from backend.controller import SafetyController
 from backend.ml_engine import ObservationTick, SurgePredictor
 from backend.schemas import (
     HealthResponse,
+    MetricRecordSchema,
     MetricSchema,
+    MLPredictionRecordSchema,
     MLPredictionResponse,
     MonitorRequest,
     MonitorResponse,
@@ -308,8 +312,28 @@ def create_app(
         )
 
     # -------------------------------------------------------------------------
-    # State, events, override
+    # State, events, history, override
     # -------------------------------------------------------------------------
+
+    @app.get("/metrics/history", response_model=List[MetricRecordSchema], tags=["Metrics"])
+    def get_metrics_history(
+        limit: int = Query(default=60, ge=1, le=500, description="Max telemetry records to return")
+    ):
+        """
+        Get recent telemetry metric observations in chronological order.
+        Read-only; does not run ML inference or step the controller.
+        """
+        return get_recent_metrics(limit=limit, db_path=app.state.db_path)
+
+    @app.get("/predictions/history", response_model=List[MLPredictionRecordSchema], tags=["ML Prediction"])
+    def get_predictions_history(
+        limit: int = Query(default=60, ge=1, le=500, description="Max prediction records to return")
+    ):
+        """
+        Get recent ML surge prediction records in chronological order.
+        Read-only; does not perform new inference or modify state.
+        """
+        return get_recent_predictions(limit=limit, db_path=app.state.db_path)
 
     @app.get("/state", response_model=StateResponse, tags=["State"])
     def get_system_state_endpoint():

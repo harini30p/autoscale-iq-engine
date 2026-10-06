@@ -8,6 +8,8 @@ import {
   checkHealth,
   getSystemState,
   getRecentEvents,
+  getMetricHistory,
+  getPredictionHistory,
   setManualOverride,
   sendMonitorMetric,
 } from '../services/api';
@@ -18,6 +20,8 @@ export default function Dashboard() {
   const [lastHealthCheck, setLastHealthCheck] = useState(null);
   const [systemState, setSystemState] = useState(null);
   const [events, setEvents] = useState([]);
+  const [metricHistory, setMetricHistory] = useState([]);
+  const [predictionHistory, setPredictionHistory] = useState([]);
   const [latestMetric, setLatestMetric] = useState(null);
   const [mlPrediction, setMlPrediction] = useState(null);
   const [error, setError] = useState(null);
@@ -25,7 +29,7 @@ export default function Dashboard() {
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [simulating, setSimulating] = useState(false);
 
-  // Fetch live system state, health, and events
+  // Fetch live system state, health, events, and telemetry/prediction history
   const fetchData = useCallback(async () => {
     setIsChecking(true);
     try {
@@ -41,6 +45,37 @@ export default function Dashboard() {
       // 3. Fetch recent events
       const eventsRes = await getRecentEvents(20);
       setEvents(Array.isArray(eventsRes) ? eventsRes : []);
+
+      // 4. Fetch telemetry history
+      const metricsRes = await getMetricHistory(60);
+      const metricsList = Array.isArray(metricsRes) ? metricsRes : [];
+      setMetricHistory(metricsList);
+
+      // 5. Fetch prediction history
+      const predsRes = await getPredictionHistory(60);
+      const predsList = Array.isArray(predsRes) ? predsRes : [];
+      setPredictionHistory(predsList);
+
+      // Populate latest metric from history if available
+      if (metricsList.length > 0) {
+        setLatestMetric((prev) => prev || metricsList[metricsList.length - 1]);
+      }
+
+      // Populate latest ML prediction from history if available
+      if (predsList.length > 0) {
+        const latestPred = predsList[predsList.length - 1];
+        setMlPrediction((prev) => prev || {
+          surge_probability: latestPred.probability,
+          raw_probability: latestPred.probability,
+          risk_signal: latestPred.risk_signal,
+          watch_threshold: latestPred.watch_threshold,
+          critical_threshold: latestPred.critical_threshold,
+          feature_vector: latestPred.feature_snapshot || [],
+          window_size: 61,
+          insufficient_data: false,
+          inference_time_ms: 0.5,
+        });
+      }
 
       setError(null);
     } catch (err) {
@@ -146,13 +181,17 @@ export default function Dashboard() {
 
         {/* Main Observability Grid: Telemetry & ML Prediction */}
         <div className="observability-row">
-          <MetricCardsGrid latestMetric={latestMetric} />
+          <MetricCardsGrid
+            latestMetric={latestMetric}
+            historyCount={metricHistory.length}
+          />
         </div>
 
         <div className="observability-row">
           <MLSurgePredictorPanel
             mlPrediction={mlPrediction}
             controllerState={systemState?.controller_state}
+            predictionHistoryCount={predictionHistory.length}
           />
         </div>
 

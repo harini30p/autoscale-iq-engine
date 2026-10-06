@@ -1,6 +1,10 @@
 import React from 'react';
 
-export default function MLSurgePredictorPanel({ mlPrediction, controllerState }) {
+export default function MLSurgePredictorPanel({
+  mlPrediction,
+  controllerState,
+  predictionHistoryCount = 0,
+}) {
   const hasPrediction = Boolean(mlPrediction);
 
   const risk = mlPrediction?.risk_signal || 'NORMAL';
@@ -27,6 +31,9 @@ export default function MLSurgePredictorPanel({ mlPrediction, controllerState })
         </div>
         <span className="section-subtitle">
           Continuous 5-minute lookahead surge probability estimation
+          {predictionHistoryCount > 0
+            ? ` (${predictionHistoryCount} prediction${predictionHistoryCount === 1 ? '' : 's'} in history)`
+            : ''}
         </span>
       </div>
 

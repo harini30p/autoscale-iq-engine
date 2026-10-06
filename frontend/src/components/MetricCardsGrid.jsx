@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function MetricCardsGrid({ latestMetric }) {
+export default function MetricCardsGrid({ latestMetric, historyCount = 0 }) {
   const hasData = Boolean(latestMetric);
 
   const metricsConfig = [
@@ -59,7 +59,11 @@ export default function MetricCardsGrid({ latestMetric }) {
       <div className="section-header">
         <h2 className="section-title">Telemetry & System Workload</h2>
         <span className="section-subtitle">
-          {hasData ? `Last updated: ${new Date(latestMetric.timestamp).toLocaleTimeString()}` : 'Live metric stream: Waiting for metric observations'}
+          {hasData
+            ? `Last updated: ${new Date(latestMetric.timestamp).toLocaleTimeString()}${
+                historyCount > 0 ? ` (${historyCount} observation${historyCount === 1 ? '' : 's'} in history)` : ''
+              }`
+            : 'Live metric stream: Waiting for telemetry history'}
         </span>
       </div>
 
