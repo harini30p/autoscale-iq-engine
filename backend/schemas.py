@@ -112,6 +112,37 @@ class OptimizationEventSchema(BaseModel):
     new_state: Dict[str, Any]
     success: bool
     error_message: Optional[str] = None
+    # Optional metric snapshots — None for events created before this feature
+    before_metrics: Optional["MetricSnapshotSchema"] = None
+    after_metrics: Optional["MetricSnapshotSchema"] = None
+    impact: Optional["ImpactMetrics"] = None
+
+
+class MetricSnapshotSchema(BaseModel):
+    """Lightweight metric snapshot captured at optimization trigger / first-post-optimization reading."""
+    timestamp: Optional[datetime] = None
+    traffic: Optional[float] = None
+    response_time: Optional[float] = None
+    db_query_time: Optional[float] = None
+    cpu_utilization: Optional[float] = None
+    memory_utilization: Optional[float] = None
+    active_users: Optional[int] = None
+    system_load: Optional[float] = None
+
+
+class ImpactMetrics(BaseModel):
+    """Percentage improvements (lower-is-better) between before and after metric snapshots.
+    Positive value = improvement. Negative = degradation. None = not calculable.
+    Formula: ((before - after) / before) * 100
+    """
+    response_time: Optional[float] = None
+    cpu_utilization: Optional[float] = None
+    memory_utilization: Optional[float] = None
+    db_query_time: Optional[float] = None
+
+
+# Rebuild OptimizationEventSchema forward refs
+OptimizationEventSchema.model_rebuild()
 
 
 class MonitorRequest(BaseModel):

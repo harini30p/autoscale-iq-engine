@@ -4,6 +4,7 @@ import SystemStatusBanner from './SystemStatusBanner';
 import MetricCardsGrid from './MetricCardsGrid';
 import MLSurgePredictorPanel from './MLSurgePredictorPanel';
 import TelemetryChartsPanel from './TelemetryChartsPanel';
+import OptimizationImpactPanel from './OptimizationImpactPanel';
 import EventsTable from './EventsTable';
 import {
   checkHealth,
@@ -178,6 +179,12 @@ export default function Dashboard() {
           error={error}
           onToggleOverride={handleToggleOverride}
           overrideUpdating={overrideUpdating}
+        />
+
+        {/* Optimization Impact — Before/After Measurement */}
+        <OptimizationImpactPanel
+          events={events}
+          controllerState={systemState?.controller_state}
         />
 
         {/* Main Observability Grid: Telemetry & ML Prediction */}

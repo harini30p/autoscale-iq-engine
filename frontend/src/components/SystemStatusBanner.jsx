@@ -1,5 +1,8 @@
 import React from 'react';
 
+const RECOVERY_CONFIRMATIONS = 3;
+const HIGH_RISK_CONFIRMATIONS = 3;
+
 export default function SystemStatusBanner({
   systemState,
   loading,
@@ -37,6 +40,8 @@ export default function SystemStatusBanner({
   const isOverride = Boolean(systemState?.manual_override);
   const isCooldown = Boolean(systemState?.cooldown_active);
   const cooldownSecs = Math.round(systemState?.cooldown_remaining_seconds || 0);
+  const consecutiveNormal = systemState?.consecutive_normal ?? 0;
+  const consecutiveHighRisk = systemState?.consecutive_high_risk ?? 0;
 
   const stateThemeMap = {
     NORMAL: 'badge-state-normal',
@@ -45,6 +50,10 @@ export default function SystemStatusBanner({
     RECOVERY: 'badge-state-recovery',
     UNKNOWN: 'badge-state-unknown',
   };
+
+  const isRecovery = state === 'RECOVERY';
+  const isOptimized = state === 'OPTIMIZED';
+  const isWatching = state === 'WATCHING';
 
   return (
     <div className="card status-banner">
@@ -85,6 +94,67 @@ export default function SystemStatusBanner({
         </div>
       </div>
 
+      {/* Recovery / Watching progress indicator */}
+      {(isRecovery || isWatching) && (
+        <div className="recovery-progress-section">
+          {isRecovery && (
+            <>
+              <div className="recovery-progress-header">
+                <span className="recovery-progress-label">
+                  🔄 Recovery in progress
+                </span>
+                <span className="recovery-progress-count">
+                  {consecutiveNormal} / {RECOVERY_CONFIRMATIONS} normal confirmations
+                </span>
+              </div>
+              <div className="recovery-progress-track">
+                <div
+                  className="recovery-progress-fill"
+                  style={{
+                    width: `${Math.min(100, (consecutiveNormal / RECOVERY_CONFIRMATIONS) * 100)}%`,
+                  }}
+                />
+              </div>
+              <span className="recovery-progress-sub">
+                Defaults restored when {RECOVERY_CONFIRMATIONS} consecutive normal readings are confirmed
+              </span>
+            </>
+          )}
+          {isWatching && (
+            <>
+              <div className="recovery-progress-header">
+                <span className="recovery-progress-label watching-label">
+                  👁 Watching — elevated risk detected
+                </span>
+                <span className="recovery-progress-count watching-count">
+                  {consecutiveHighRisk} / {HIGH_RISK_CONFIRMATIONS} critical confirmations
+                </span>
+              </div>
+              <div className="recovery-progress-track watching-track">
+                <div
+                  className="recovery-progress-fill watching-fill"
+                  style={{
+                    width: `${Math.min(100, (consecutiveHighRisk / HIGH_RISK_CONFIRMATIONS) * 100)}%`,
+                  }}
+                />
+              </div>
+              <span className="recovery-progress-sub">
+                Optimization triggers after {HIGH_RISK_CONFIRMATIONS} consecutive critical readings
+              </span>
+            </>
+          )}
+        </div>
+      )}
+
+      {isOptimized && (
+        <div className="optimized-notice">
+          <span>⚡ Optimizations active — monitoring for recovery conditions</span>
+          <span className="recovery-progress-sub">
+            {RECOVERY_CONFIRMATIONS} consecutive normal readings required to restore defaults
+          </span>
+        </div>
+      )}
+
       <div className="status-divider" />
 
       <div className="status-levers-grid">
@@ -112,14 +182,14 @@ export default function SystemStatusBanner({
         <div className="lever-item">
           <span className="lever-label">High-Risk Confirmations</span>
           <span className="lever-value">
-            {systemState?.consecutive_high_risk ?? 0} / 3
+            {consecutiveHighRisk} / {HIGH_RISK_CONFIRMATIONS}
           </span>
         </div>
 
         <div className="lever-item">
           <span className="lever-label">Recovery Confirmations</span>
           <span className="lever-value">
-            {systemState?.consecutive_normal ?? 0} / 3
+            {consecutiveNormal} / {RECOVERY_CONFIRMATIONS}
           </span>
         </div>
       </div>

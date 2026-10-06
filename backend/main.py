@@ -28,6 +28,8 @@ from backend.database import (
     get_recent_events,
     get_recent_metrics,
     get_recent_predictions,
+    attach_before_metrics_to_latest_event,
+    attach_after_metrics_to_latest_event,
 )
 from backend.monitoring import assess_freshness
 from backend.controller import SafetyController
@@ -70,6 +72,20 @@ def _build_observation_tick(metric: MetricSchema) -> ObservationTick:
         trigger_storage=False,
         trigger_others=False,
     )
+
+
+def _metric_to_snapshot(metric: MetricSchema) -> dict:
+    """Convert a MetricSchema to a lightweight dict for before/after persistence."""
+    return {
+        "timestamp": metric.timestamp.isoformat(),
+        "traffic": metric.traffic,
+        "response_time": metric.response_time,
+        "db_query_time": metric.db_query_time,
+        "cpu_utilization": metric.cpu_utilization,
+        "memory_utilization": metric.memory_utilization,
+        "active_users": metric.active_users,
+        "system_load": metric.system_load,
+    }
 
 
 def _ml_result_to_schema(result) -> MLPredictionResponse:
@@ -255,6 +271,31 @@ def create_app(
             risk_signal=effective_risk_signal,
             is_stale=is_stale,
         )
+
+        # 5. Attach metric snapshots to optimization events
+        #    (post-hoc DB updates; do NOT change controller/optimizer logic)
+        if not is_stale:
+            snapshot = _metric_to_snapshot(metric)
+            if result.optimization_applied:
+                # This metric is the "before" snapshot — it triggered the optimization.
+                try:
+                    attach_before_metrics_to_latest_event(
+                        before_metrics=snapshot,
+                        db_path=app.state.db_path,
+                    )
+                except Exception as snap_exc:
+                    logger.warning("Failed to attach before_metrics: %s", snap_exc)
+            elif result.controller_state.value in ("OPTIMIZED", "RECOVERY"):
+                # System is already optimized (OPTIMIZED) or has started recovery (RECOVERY).
+                # The first fresh metric arriving after optimization is the "after" snapshot.
+                # attach_after_metrics_to_latest_event is idempotent — won't overwrite.
+                try:
+                    attach_after_metrics_to_latest_event(
+                        after_metrics=snapshot,
+                        db_path=app.state.db_path,
+                    )
+                except Exception as snap_exc:
+                    logger.warning("Failed to attach after_metrics: %s", snap_exc)
 
         return MonitorResponse(
             metric_valid=True,

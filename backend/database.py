@@ -75,6 +75,21 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> None:
             )
         """)
 
+        # Backward-compatible migration: add metric snapshot columns if missing.
+        # These columns hold JSON and are NULL for events created before this migration.
+        for col_def in [
+            "before_metrics_json TEXT",
+            "after_metrics_json TEXT",
+        ]:
+            col_name = col_def.split()[0]
+            try:
+                cursor.execute(
+                    f"ALTER TABLE optimization_events ADD COLUMN {col_def}"
+                )
+            except Exception:
+                # Column already exists — safe to ignore
+                pass
+
         # System state single-row table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS system_state (
@@ -258,13 +273,46 @@ def update_system_state(
     return get_system_state(db_path)
 
 
+def _compute_impact(before: Optional[Dict], after: Optional[Dict]) -> Optional[Dict]:
+    """
+    Compute improvement percentages between before and after metric snapshots.
+    For response_time, cpu_utilization, memory_utilization, db_query_time,
+    lower-is-better: improvement = ((before - after) / before) * 100.
+    Returns None if before or after is absent.
+    """
+    if not before or not after:
+        return None
+    impact: Dict[str, Any] = {}
+    for field in ("response_time", "cpu_utilization", "memory_utilization", "db_query_time"):
+        b = before.get(field)
+        a = after.get(field)
+        if b is None or a is None:
+            impact[field] = None
+            continue
+        try:
+            b_f = float(b)
+            a_f = float(a)
+            if b_f == 0.0:
+                impact[field] = None  # Avoid division-by-zero
+            else:
+                impact[field] = round(((b_f - a_f) / b_f) * 100, 2)
+        except (TypeError, ValueError):
+            impact[field] = None
+    return impact
+
+
 def get_recent_events(limit: int = 50, db_path: str = DEFAULT_DB_PATH) -> List[Dict[str, Any]]:
-    """Retrieve recent optimization/recovery events ordered by latest first."""
+    """Retrieve recent optimization/recovery events ordered by latest first.
+    Includes optional before_metrics, after_metrics, and impact fields.
+    Old records without snapshots return None for these fields.
+    """
     init_db(db_path)
     with get_connection(db_path) as conn:
         cursor = conn.cursor()
+        # SELECT * to include the optional snapshot columns added by migration
         cursor.execute("""
-            SELECT id, timestamp, action, reason, previous_state, new_state, success, error_message
+            SELECT id, timestamp, action, reason, previous_state, new_state,
+                   success, error_message, before_metrics_json, after_metrics_json
             FROM optimization_events
             ORDER BY id DESC
             LIMIT ?
@@ -272,6 +320,18 @@ def get_recent_events(limit: int = 50, db_path: str = DEFAULT_DB_PATH) -> List[D
         rows = cursor.fetchall()
         events = []
         for r in rows:
+            before_m = None
+            after_m = None
+            try:
+                if r["before_metrics_json"]:
+                    before_m = json.loads(r["before_metrics_json"])
+            except Exception:
+                pass
+            try:
+                if r["after_metrics_json"]:
+                    after_m = json.loads(r["after_metrics_json"])
+            except Exception:
+                pass
             events.append({
                 "id": r["id"],
                 "timestamp": datetime.fromisoformat(r["timestamp"]),
@@ -280,9 +340,68 @@ def get_recent_events(limit: int = 50, db_path: str = DEFAULT_DB_PATH) -> List[D
                 "previous_state": json.loads(r["previous_state"]),
                 "new_state": json.loads(r["new_state"]),
                 "success": bool(r["success"]),
-                "error_message": r["error_message"]
+                "error_message": r["error_message"],
+                "before_metrics": before_m,
+                "after_metrics": after_m,
+                "impact": _compute_impact(before_m, after_m),
             })
         return events
+
+
+def attach_before_metrics_to_latest_event(
+    before_metrics: Dict[str, Any],
+    action: str = "apply_optimizations",
+    db_path: str = DEFAULT_DB_PATH,
+) -> bool:
+    """Attach a before-metrics snapshot to the most recent matching event.
+    Only updates an event that does not already have before_metrics set.
+    Returns True if an update was made.
+    """
+    init_db(db_path)
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id FROM optimization_events
+            WHERE action = ? AND before_metrics_json IS NULL
+            ORDER BY id DESC LIMIT 1
+        """, (action,))
+        row = cursor.fetchone()
+        if not row:
+            return False
+        cursor.execute(
+            "UPDATE optimization_events SET before_metrics_json = ? WHERE id = ?",
+            (json.dumps(before_metrics), row["id"])
+        )
+        conn.commit()
+        return cursor.rowcount > 0
+
+
+def attach_after_metrics_to_latest_event(
+    after_metrics: Dict[str, Any],
+    action: str = "apply_optimizations",
+    db_path: str = DEFAULT_DB_PATH,
+) -> bool:
+    """Attach an after-metrics snapshot to the most recent apply_optimizations event
+    that already has before_metrics but does NOT yet have after_metrics.
+    Returns True if an update was made (i.e., this is the first after reading).
+    """
+    init_db(db_path)
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id FROM optimization_events
+            WHERE action = ? AND before_metrics_json IS NOT NULL AND after_metrics_json IS NULL
+            ORDER BY id DESC LIMIT 1
+        """, (action,))
+        row = cursor.fetchone()
+        if not row:
+            return False
+        cursor.execute(
+            "UPDATE optimization_events SET after_metrics_json = ? WHERE id = ?",
+            (json.dumps(after_metrics), row["id"])
+        )
+        conn.commit()
+        return cursor.rowcount > 0
 
 
 def get_recent_metrics(limit: int = 50, db_path: str = DEFAULT_DB_PATH) -> List[Dict[str, Any]]:
