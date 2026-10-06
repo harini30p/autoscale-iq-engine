@@ -21,7 +21,12 @@ from backend.config import (
     ML_CALIBRATOR_PATH,
     ML_THRESHOLDS_PATH,
 )
-from backend.database import init_db, insert_metric, get_recent_events
+from backend.database import (
+    init_db,
+    insert_metric,
+    insert_ml_prediction,
+    get_recent_events,
+)
 from backend.monitoring import assess_freshness
 from backend.controller import SafetyController
 from backend.ml_engine import ObservationTick, SurgePredictor
@@ -219,6 +224,20 @@ def create_app(
                 predictor.push_tick(tick)
                 # Use ML risk signal as the effective signal
                 effective_risk_signal = ml_result.risk_signal
+
+                # Persist ML prediction (graceful degradation on persistence failure)
+                try:
+                    insert_ml_prediction(
+                        probability=ml_result.surge_probability,
+                        risk_signal=ml_result.risk_signal.value,
+                        watch_threshold=ml_result.watch_threshold,
+                        critical_threshold=ml_result.critical_threshold,
+                        feature_snapshot=ml_result.feature_vector,
+                        timestamp=metric.timestamp,
+                        db_path=app.state.db_path,
+                    )
+                except Exception as db_exc:
+                    logger.warning("Failed to persist ML prediction: %s", db_exc)
             except RuntimeError:
                 # SurgePredictor not initialized — use fallback
                 logger.warning("SurgePredictor unavailable; using fallback risk signal")

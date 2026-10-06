@@ -48,14 +48,16 @@ def init_db(db_path: str = DEFAULT_DB_PATH) -> None:
             )
         """)
 
-        # Predictions table for future ML compatibility
+        # ML predictions table
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS predictions (
+            CREATE TABLE IF NOT EXISTS ml_predictions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 timestamp TEXT NOT NULL,
-                risk_probability REAL,
-                risk_level TEXT,
-                actual_state TEXT
+                probability REAL NOT NULL,
+                risk_signal TEXT NOT NULL,
+                watch_threshold REAL NOT NULL,
+                critical_threshold REAL NOT NULL,
+                feature_snapshot TEXT NOT NULL
             )
         """)
 
@@ -297,3 +299,69 @@ def get_recent_metrics(limit: int = 50, db_path: str = DEFAULT_DB_PATH) -> List[
         """, (limit,))
         rows = cursor.fetchall()
         return [dict(r) for r in rows]
+
+
+def insert_ml_prediction(
+    probability: float,
+    risk_signal: str,
+    watch_threshold: float,
+    critical_threshold: float,
+    feature_snapshot: Any,
+    timestamp: Optional[datetime] = None,
+    db_path: str = DEFAULT_DB_PATH
+) -> int:
+    """Insert an ML surge prediction record into SQLite."""
+    init_db(db_path)
+    ts = timestamp or datetime.now(timezone.utc)
+    ts_str = ts.isoformat() if isinstance(ts, datetime) else str(ts)
+    snapshot_str = json.dumps(feature_snapshot) if not isinstance(feature_snapshot, str) else feature_snapshot
+
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO ml_predictions (
+                timestamp, probability, risk_signal,
+                watch_threshold, critical_threshold, feature_snapshot
+            ) VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            ts_str,
+            float(probability),
+            str(risk_signal),
+            float(watch_threshold),
+            float(critical_threshold),
+            snapshot_str,
+        ))
+        conn.commit()
+        return cursor.lastrowid or 0
+
+
+def get_recent_predictions(limit: int = 50, db_path: str = DEFAULT_DB_PATH) -> List[Dict[str, Any]]:
+    """Retrieve recent ML predictions ordered by latest first."""
+    init_db(db_path)
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            SELECT id, timestamp, probability, risk_signal,
+                   watch_threshold, critical_threshold, feature_snapshot
+            FROM ml_predictions
+            ORDER BY id DESC
+            LIMIT ?
+        """, (limit,))
+        rows = cursor.fetchall()
+        predictions = []
+        for r in rows:
+            snapshot = r["feature_snapshot"]
+            try:
+                snapshot = json.loads(snapshot)
+            except Exception:
+                pass
+            predictions.append({
+                "id": r["id"],
+                "timestamp": datetime.fromisoformat(r["timestamp"]),
+                "probability": r["probability"],
+                "risk_signal": r["risk_signal"],
+                "watch_threshold": r["watch_threshold"],
+                "critical_threshold": r["critical_threshold"],
+                "feature_snapshot": snapshot,
+            })
+        return predictions
