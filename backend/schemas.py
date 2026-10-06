@@ -95,6 +95,21 @@ class MonitorRequest(BaseModel):
     risk_signal: RiskSignal = Field(default=RiskSignal.NORMAL, description="Generic risk signal from monitoring/ML layer")
 
 
+class MLPredictionResponse(BaseModel):
+    """
+    Structured ML surge prediction result included in monitor responses.
+    All probabilities are calibrated (isotonic regression).
+    """
+    surge_probability: float = Field(..., description="Calibrated surge probability [0, 1]")
+    raw_probability: float = Field(..., description="Uncalibrated model output probability")
+    risk_signal: RiskSignal = Field(..., description="Risk classification from ML thresholds")
+    watch_threshold: float = Field(..., description="tau_watch threshold used")
+    critical_threshold: float = Field(..., description="tau_crit threshold used")
+    window_size: int = Field(..., description="Number of ticks in the rolling window")
+    insufficient_data: bool = Field(..., description="True if window < 61 ticks")
+    inference_time_ms: float = Field(..., description="Inference latency in milliseconds")
+
+
 class MonitorResponse(BaseModel):
     metric_valid: bool = True
     stale: bool
@@ -108,6 +123,37 @@ class MonitorResponse(BaseModel):
     cooldown_active: bool
     consecutive_high_risk: int
     consecutive_normal: int
+    ml_prediction: Optional[MLPredictionResponse] = Field(
+        default=None,
+        description="ML surge prediction result (None if ML unavailable)"
+    )
+
+
+class PredictRequest(BaseModel):
+    """
+    Direct surge prediction request (does not go through the safety controller).
+
+    Only fields that are part of the locked 19-feature training schema are
+    accepted. Resource/latency metrics (cpu, memory, response time, db query
+    time) are NOT model inputs.
+    """
+    invocations: float = Field(..., ge=0, description="Current invocations/min")
+    minute_of_day: int = Field(..., ge=0, le=1439, description="Minute of day (0–1439)")
+    # Trigger one-hot — 7 categories matching the locked training schema
+    trigger_timer: bool = Field(default=False, description="Timer trigger active")
+    trigger_http: bool = Field(default=True, description="HTTP trigger active")
+    trigger_queue: bool = Field(default=False, description="Queue trigger active")
+    trigger_orchestration: bool = Field(default=False, description="Orchestration trigger active")
+    trigger_event: bool = Field(default=False, description="Event trigger active")
+    trigger_storage: bool = Field(default=False, description="Storage trigger active")
+    trigger_others: bool = Field(default=False, description="Other trigger active")
+
+
+class PredictResponse(BaseModel):
+    """Response from the /predict endpoint."""
+    ml_prediction: MLPredictionResponse
+    model_name: str = "HistGradientBoostingClassifier 5M Config6"
+    calibration: str = "Isotonic Regression"
 
 
 class ValidateMetricResponse(BaseModel):

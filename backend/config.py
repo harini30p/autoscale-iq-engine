@@ -9,6 +9,20 @@ import os
 # Base directory for the backend
 BASE_DIR = Path(__file__).resolve().parent
 
+# Project root (one level above backend/)
+PROJECT_ROOT = BASE_DIR.parent
+
+# ML artifact paths (resolved relative to project root)
+ML_ARTIFACTS_DIR = PROJECT_ROOT / "ml" / "artifacts"
+ML_MODEL_PATH = ML_ARTIFACTS_DIR / "model_5m_config6.joblib"
+ML_CALIBRATOR_PATH = ML_ARTIFACTS_DIR / "calibrator_5m_config6_isotonic.joblib"
+ML_THRESHOLDS_PATH = ML_ARTIFACTS_DIR / "thresholds_5m_config6.json"
+
+# Allow overriding artifact paths via environment variables
+ML_MODEL_PATH = Path(os.getenv("AUTOSCALE_ML_MODEL_PATH", str(ML_MODEL_PATH)))
+ML_CALIBRATOR_PATH = Path(os.getenv("AUTOSCALE_ML_CALIBRATOR_PATH", str(ML_CALIBRATOR_PATH)))
+ML_THRESHOLDS_PATH = Path(os.getenv("AUTOSCALE_ML_THRESHOLDS_PATH", str(ML_THRESHOLDS_PATH)))
+
 # Database configuration
 DEFAULT_DB_PATH = os.getenv("AUTOSCALE_DB_PATH", str(BASE_DIR / "autoscale.db"))
 

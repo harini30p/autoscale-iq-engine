@@ -1,6 +1,7 @@
 """
 Tests for AutoScale IQ FastAPI Endpoints.
-Verifies /health, /metrics/validate, /monitor, /state, /events, /override, and error handling.
+Verifies /health, /metrics/validate, /monitor, /state, /events, /override,
+/predict, and error handling.
 """
 
 from datetime import datetime, timezone, timedelta
@@ -17,7 +18,8 @@ from backend.config import CACHE_NORMAL, CACHE_OPTIMIZED
 def client(tmp_path):
     db_file = str(tmp_path / "test_api.db")
     init_db(db_file)
-    app = create_app(db_path=db_file)
+    # load_ml=False to avoid requiring ML artifacts in unit tests
+    app = create_app(db_path=db_file, load_ml=False)
     with TestClient(app) as test_client:
         yield test_client
 
@@ -168,3 +170,32 @@ def test_override_endpoint(client):
     res2 = client.post("/override", json={"manual_override": False})
     assert res2.status_code == 200
     assert res2.json()["manual_override"] is False
+
+
+def test_monitor_response_includes_ml_prediction_none_when_ml_disabled(client):
+    """When load_ml=False, ml_prediction should be None."""
+    payload = {
+        "metric": sample_metric_payload(),
+        "risk_signal": RiskSignal.NORMAL.value
+    }
+    response = client.post("/monitor", json=payload)
+    assert response.status_code == 200
+    data = response.json()
+    assert data["ml_prediction"] is None
+
+
+def test_predict_endpoint_returns_503_when_ml_disabled(client):
+    """When load_ml=False, /predict should return 503."""
+    payload = {
+        "invocations": 10.0,
+        "minute_of_day": 120,
+        "trigger_http": True,
+        "trigger_timer": False,
+        "trigger_queue": False,
+        "trigger_orchestration": False,
+        "trigger_event": False,
+        "trigger_storage": False,
+        "trigger_others": False,
+    }
+    response = client.post("/predict", json=payload)
+    assert response.status_code == 503
