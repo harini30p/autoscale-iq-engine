@@ -3,6 +3,7 @@ import Header from './Header';
 import SystemStatusBanner from './SystemStatusBanner';
 import MetricCardsGrid from './MetricCardsGrid';
 import MLSurgePredictorPanel from './MLSurgePredictorPanel';
+import TelemetryChartsPanel from './TelemetryChartsPanel';
 import EventsTable from './EventsTable';
 import {
   checkHealth,
@@ -194,6 +195,12 @@ export default function Dashboard() {
             predictionHistoryCount={predictionHistory.length}
           />
         </div>
+
+        {/* Real-time telemetry & ML probability charts */}
+        <TelemetryChartsPanel
+          metricHistory={metricHistory}
+          predictionHistory={predictionHistory}
+        />
 
         {/* Interactive Telemetry Test Bar */}
         <div className="card test-bar-card">
