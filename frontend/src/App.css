@@ -618,40 +618,176 @@
 }
 
 /* --------------------------------------------------------------------------
-   Simulator Bar
+   Interactive Simulation Panel
    -------------------------------------------------------------------------- */
-.test-bar-card {
+.sim-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  background: #101929;
+  border: 1px solid #2d3e58;
+}
+
+.sim-panel-running {
+  border-color: rgba(59, 130, 246, 0.45);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.12);
+}
+
+.sim-panel-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  background: #101929;
-  border: 1px dashed #2d3e58;
-  flex-wrap: wrap;
+  align-items: flex-start;
   gap: 1rem;
 }
 
-.test-bar-left {
-  display: flex;
-  flex-direction: column;
-  gap: 0.2rem;
-}
-
-.test-bar-title {
-  font-size: 0.9rem;
+.sim-panel-title {
+  font-size: 0.95rem;
   font-weight: 600;
   color: var(--text-primary);
+  margin: 0;
 }
 
-.test-bar-desc {
+.sim-panel-subtitle {
   font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0.25rem 0 0;
+}
+
+.sim-status-pill {
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 0.28rem 0.65rem;
+  border-radius: 999px;
+  border: 1px solid var(--border-card);
+  color: var(--text-secondary);
+}
+
+.sim-status-ready,
+.sim-status-stopped {
+  background: rgba(148, 163, 184, 0.12);
+  border-color: rgba(148, 163, 184, 0.28);
+}
+
+.sim-status-running {
+  background: var(--color-normal-bg);
+  border-color: var(--color-normal-border);
+  color: var(--color-normal);
+}
+
+.sim-status-paused {
+  background: var(--color-watching-bg);
+  border-color: var(--color-watching-border);
+  color: var(--color-watching);
+}
+
+.sim-status-completed {
+  background: var(--color-optimized-bg);
+  border-color: var(--color-optimized-border);
+  color: #c4b5fd;
+}
+
+.sim-panel-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) minmax(0, 0.8fr);
+  gap: 0.85rem;
+}
+
+.sim-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.sim-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
   color: var(--text-muted);
 }
 
-.test-bar-actions {
+.sim-select {
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  background: #0b1220;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.6rem;
+}
+
+.sim-select:focus {
+  outline: none;
+  border-color: var(--border-focus);
+}
+
+.sim-select:disabled {
+  opacity: 0.55;
+}
+
+.sim-phase-value {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+  color: var(--accent-cyan);
+  background: #0b1220;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.6rem;
+  text-transform: capitalize;
+}
+
+.sim-description {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.sim-progress-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.sim-progress-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.sim-progress-track {
+  height: 8px;
+  border-radius: 999px;
+  background: #0b1220;
+  border: 1px solid var(--border-card);
+  overflow: hidden;
+}
+
+.sim-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb 0%, #06b6d4 100%);
+  width: 0%;
+  transition: width 0.25s ease;
+}
+
+.sim-controls {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   flex-wrap: wrap;
+}
+
+.sim-error {
+  font-size: 0.8rem;
+  color: #fca5a5;
+  background: var(--color-critical-bg);
+  border: 1px solid var(--color-critical-border);
+  border-radius: var(--radius-sm);
+  padding: 0.55rem 0.75rem;
 }
 
 .auto-refresh-toggle {
@@ -881,9 +1017,8 @@
     align-items: flex-start;
   }
 
-  .test-bar-card {
-    flex-direction: column;
-    align-items: flex-start;
+  .sim-panel-grid {
+    grid-template-columns: 1fr;
   }
 
   .app-footer {

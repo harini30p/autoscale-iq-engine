@@ -15,34 +15,48 @@ async function fetchJson(endpoint, options = {}) {
   const timeoutId = setTimeout(() => controller.abort(), 8000);
 
   try {
+    const requestHeaders = {
+      Accept: 'application/json',
+      ...(options.headers || {}),
+    };
+
+    if (options.body !== undefined && !('Content-Type' in requestHeaders)) {
+      requestHeaders['Content-Type'] = 'application/json';
+    }
+
     const response = await fetch(url, {
       ...options,
       signal: controller.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        ...(options.headers || {}),
-      },
+      headers: requestHeaders,
     });
 
     clearTimeout(timeoutId);
 
+    let payload = null;
+    if (response.status !== 204 && response.headers.get('content-length') !== '0') {
+      const rawText = await response.text();
+      if (rawText) {
+        try {
+          payload = JSON.parse(rawText);
+        } catch {
+          payload = rawText;
+        }
+      }
+    }
+
     if (!response.ok) {
       let errorDetail = `HTTP ${response.status} ${response.statusText}`;
-      try {
-        const errorData = await response.json();
-        if (errorData?.detail) {
-          errorDetail = typeof errorData.detail === 'string'
-            ? errorData.detail
-            : JSON.stringify(errorData.detail);
-        }
-      } catch {
-        // Response body was not JSON
+      if (typeof payload === 'string' && payload) {
+        errorDetail = payload;
+      } else if (payload?.detail) {
+        errorDetail = typeof payload.detail === 'string'
+          ? payload.detail
+          : JSON.stringify(payload.detail);
       }
       throw new Error(errorDetail);
     }
 
-    return await response.json();
+    return payload;
   } catch (err) {
     clearTimeout(timeoutId);
     if (err.name === 'AbortError') {
@@ -128,6 +142,37 @@ export async function setManualOverride(manualOverride) {
   return fetchJson('/override', {
     method: 'POST',
     body: JSON.stringify({ manual_override: manualOverride }),
+  });
+}
+
+/**
+ * List simulation scenario metadata (GET /simulation/scenarios).
+ * Metadata only — no metric payloads.
+ * @returns {Promise<Array<Object>>}
+ */
+export async function getSimulationScenarios() {
+  return fetchJson('/simulation/scenarios');
+}
+
+/**
+ * Load one scenario including tick payloads (GET /simulation/scenarios/:name).
+ * Ticks have no timestamps; playback stamps UTC before POST /monitor.
+ * @param {string} name
+ * @returns {Promise<Object>}
+ */
+export async function getSimulationScenario(name) {
+  return fetchJson(`/simulation/scenarios/${encodeURIComponent(name)}`);
+}
+
+/**
+ * Restore controller defaults and clear the ML rolling window (POST /simulation/reset).
+ * Does not delete historical metrics, predictions, or events.
+ * @returns {Promise<Object>}
+ */
+export async function resetSimulation() {
+  return fetchJson('/simulation/reset', {
+    method: 'POST',
+    body: JSON.stringify({}),
   });
 }
 

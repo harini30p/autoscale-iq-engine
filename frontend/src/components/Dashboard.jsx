@@ -6,6 +6,7 @@ import MLSurgePredictorPanel from './MLSurgePredictorPanel';
 import TelemetryChartsPanel from './TelemetryChartsPanel';
 import OptimizationImpactPanel from './OptimizationImpactPanel';
 import EventsTable from './EventsTable';
+import SimulationPanel from './SimulationPanel';
 import {
   checkHealth,
   getSystemState,
@@ -13,7 +14,6 @@ import {
   getMetricHistory,
   getPredictionHistory,
   setManualOverride,
-  sendMonitorMetric,
 } from '../services/api';
 
 export default function Dashboard() {
@@ -29,11 +29,11 @@ export default function Dashboard() {
   const [error, setError] = useState(null);
   const [overrideUpdating, setOverrideUpdating] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [simulating, setSimulating] = useState(false);
 
   // Fetch live system state, health, events, and telemetry/prediction history
-  const fetchData = useCallback(async () => {
-    setIsChecking(true);
+  const fetchData = useCallback(async (options = {}) => {
+    const quiet = options.quiet === true;
+    if (!quiet) setIsChecking(true);
     try {
       // 1. Check health
       const healthRes = await checkHealth();
@@ -84,7 +84,7 @@ export default function Dashboard() {
       setBackendConnected(false);
       setError(err.message || 'Failed to connect to AutoScale IQ backend');
     } finally {
-      setIsChecking(false);
+      if (!quiet) setIsChecking(false);
     }
   }, []);
 
@@ -114,36 +114,14 @@ export default function Dashboard() {
     }
   };
 
-  // Optional sample observation simulation to test live end-to-end integration
-  const handleSimulateSampleObservation = async (spike = false) => {
-    setSimulating(true);
-    try {
-      const samplePayload = {
-        metric: {
-          timestamp: new Date().toISOString(),
-          traffic: spike ? 550.0 : 65.0,
-          active_users: spike ? 120 : 15,
-          cpu_utilization: spike ? 72.0 : 28.0,
-          memory_utilization: spike ? 65.0 : 35.0,
-          response_time: spike ? 240.0 : 85.0,
-          db_query_time: spike ? 45.0 : 18.0,
-          system_load: spike ? 1.8 : 0.6,
-        },
-        risk_signal: 'normal',
-      };
-
-      const monitorRes = await sendMonitorMetric(samplePayload);
-      setLatestMetric(samplePayload.metric);
-      if (monitorRes?.ml_prediction) {
-        setMlPrediction(monitorRes.ml_prediction);
-      }
-      // Refresh system state and events
-      await fetchData();
-    } catch (err) {
-      setError(`Simulation failed: ${err.message}`);
-    } finally {
-      setSimulating(false);
+  const handleSimulationTick = async (monitorRes, metric) => {
+    if (metric) {
+      setLatestMetric(metric);
     }
+    if (monitorRes?.ml_prediction) {
+      setMlPrediction(monitorRes.ml_prediction);
+    }
+    await fetchData({ quiet: true });
   };
 
   return (
@@ -209,41 +187,12 @@ export default function Dashboard() {
           predictionHistory={predictionHistory}
         />
 
-        {/* Interactive Telemetry Test Bar */}
-        <div className="card test-bar-card">
-          <div className="test-bar-left">
-            <span className="test-bar-title">🧪 End-to-End Observation Simulator</span>
-            <span className="test-bar-desc">
-              Send a test metric observation through <code>/monitor</code> to observe live feature generation, ML calibration, and controller evaluations.
-            </span>
-          </div>
-          <div className="test-bar-actions">
-            <button
-              type="button"
-              className="btn btn-secondary btn-sm"
-              onClick={() => handleSimulateSampleObservation(false)}
-              disabled={simulating || !backendConnected}
-            >
-              {simulating ? 'Sending...' : 'Send Baseline Metric (65 req/min)'}
-            </button>
-            <button
-              type="button"
-              className="btn btn-accent btn-sm"
-              onClick={() => handleSimulateSampleObservation(true)}
-              disabled={simulating || !backendConnected}
-            >
-              {simulating ? 'Sending...' : '⚡ Send Surge Spike (550 req/min)'}
-            </button>
-            <label className="auto-refresh-toggle">
-              <input
-                type="checkbox"
-                checked={autoRefresh}
-                onChange={(e) => setAutoRefresh(e.target.checked)}
-              />
-              Auto-poll (5s)
-            </label>
-          </div>
-        </div>
+        <SimulationPanel
+          backendConnected={backendConnected}
+          autoRefresh={autoRefresh}
+          onAutoRefreshChange={setAutoRefresh}
+          onTickResult={handleSimulationTick}
+        />
 
         {/* Events Audit Table */}
         <EventsTable

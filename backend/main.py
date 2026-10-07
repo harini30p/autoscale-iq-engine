@@ -30,7 +30,9 @@ from backend.database import (
     get_recent_predictions,
     attach_before_metrics_to_latest_event,
     attach_after_metrics_to_latest_event,
+    reset_system_state_to_defaults,
 )
+from backend.simulation import get_scenario, list_scenarios
 from backend.monitoring import assess_freshness
 from backend.controller import SafetyController
 from backend.ml_engine import ObservationTick, SurgePredictor
@@ -47,6 +49,9 @@ from backend.schemas import (
     PredictRequest,
     PredictResponse,
     RiskSignal,
+    SimulationResetResponse,
+    SimulationScenarioDetail,
+    SimulationScenarioMetadata,
     StateResponse,
     ValidateMetricResponse,
 )
@@ -395,6 +400,82 @@ def create_app(
         """Enable or disable manual safety override."""
         controller = get_controller()
         return controller.set_manual_override(payload.manual_override)
+
+    @app.get(
+        "/simulation/scenarios",
+        response_model=List[SimulationScenarioMetadata],
+        tags=["Simulation"],
+    )
+    def get_simulation_scenarios():
+        """Return scenario metadata only (no metric payloads, no ingestion)."""
+        return list_scenarios()
+
+    @app.get(
+        "/simulation/scenarios/{name}",
+        response_model=SimulationScenarioDetail,
+        tags=["Simulation"],
+    )
+    def get_simulation_scenario(name: str):
+        """
+        Return one scenario's metadata and tick payloads.
+
+        Ticks have no timestamps. Playback must POST each tick to /monitor
+        with a fresh UTC timestamp. This is not an ingestion endpoint.
+        """
+        try:
+            scenario = get_scenario(name)
+        except KeyError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=str(exc),
+            ) from exc
+        meta = scenario.metadata()
+        return {
+            **meta,
+            "ticks": [
+                {
+                    "index": tick.index,
+                    "phase": tick.phase,
+                    "metric": dict(tick.metric),
+                }
+                for tick in scenario.ticks
+            ],
+        }
+
+    @app.post("/simulation/reset", response_model=SimulationResetResponse, tags=["Simulation"])
+    def reset_simulation():
+        """
+        Restore controller/levers to defaults and clear the ML rolling window.
+
+        Does not drop tables, delete history, or modify locked ML artifacts.
+        Simulation ticks must still be ingested via POST /monitor.
+        """
+        reset_system_state_to_defaults(db_path=app.state.db_path)
+
+        ml_window_cleared = False
+        ml_window_length = 0
+        if app.state.load_ml:
+            try:
+                predictor = SurgePredictor.get_instance()
+                predictor.clear_window()
+                ml_window_cleared = True
+                ml_window_length = predictor.window_length
+            except RuntimeError:
+                logger.warning("SurgePredictor unavailable; system state reset without ML window clear")
+
+        controller = get_controller()
+        state = controller.get_state()
+        return SimulationResetResponse(
+            status="ok",
+            controller_state=state.controller_state,
+            current_configuration=state.current_configuration,
+            manual_override=state.manual_override,
+            consecutive_high_risk=state.consecutive_high_risk,
+            consecutive_normal=state.consecutive_normal,
+            last_optimization_timestamp=state.last_optimization_timestamp,
+            ml_window_cleared=ml_window_cleared,
+            ml_window_length=ml_window_length,
+        )
 
     return app
 

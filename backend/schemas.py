@@ -236,3 +236,44 @@ class OverrideRequest(BaseModel):
 class HealthResponse(BaseModel):
     status: str = "ok"
     timestamp: datetime
+
+
+class SimulationResetResponse(BaseModel):
+    """Response from POST /simulation/reset."""
+    status: str = "ok"
+    controller_state: ControllerState
+    current_configuration: SystemConfiguration
+    manual_override: bool
+    consecutive_high_risk: int
+    consecutive_normal: int
+    last_optimization_timestamp: Optional[datetime] = None
+    ml_window_cleared: bool
+    ml_window_length: int
+
+
+class SimulationPhaseRangeSchema(BaseModel):
+    phase: str
+    start_index: int
+    end_index: int
+
+
+class SimulationScenarioMetadata(BaseModel):
+    """Metadata only — no metric payloads."""
+    name: str
+    description: str
+    tick_count: int
+    phases: List[str]
+    phase_ranges: List[SimulationPhaseRangeSchema]
+    warmup_tick_count: int
+
+
+class SimulationTickPayload(BaseModel):
+    """Scenario tick without a timestamp. Playback stamps UTC at send time."""
+    index: int
+    phase: str
+    metric: Dict[str, Any]
+
+
+class SimulationScenarioDetail(SimulationScenarioMetadata):
+    """Scenario metadata plus tick payloads for frontend playback."""
+    ticks: List[SimulationTickPayload]

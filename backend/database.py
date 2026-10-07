@@ -273,6 +273,43 @@ def update_system_state(
     return get_system_state(db_path)
 
 
+def reset_system_state_to_defaults(db_path: str = DEFAULT_DB_PATH) -> Dict[str, Any]:
+    """
+    Restore the single system_state row to NORMAL and default optimization levers.
+
+    Does not drop tables or delete metrics, predictions, or events.
+    Clears last_optimization_timestamp so cooldown does not linger after a demo reset.
+    """
+    init_db(db_path)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    with get_connection(db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE system_state
+            SET controller_state = ?,
+                caching = ?,
+                pagination_size = ?,
+                heavy_components = ?,
+                manual_override = 0,
+                consecutive_high_risk = 0,
+                consecutive_normal = 0,
+                last_optimization_timestamp = NULL,
+                updated_at = ?
+            WHERE id = 1
+            """,
+            (
+                ControllerState.NORMAL.value,
+                CACHE_NORMAL,
+                PAGINATION_NORMAL,
+                HEAVY_COMPONENTS_NORMAL,
+                now_iso,
+            ),
+        )
+        conn.commit()
+    return get_system_state(db_path)
+
+
 def _compute_impact(before: Optional[Dict], after: Optional[Dict]) -> Optional[Dict]:
     """
     Compute improvement percentages between before and after metric snapshots.

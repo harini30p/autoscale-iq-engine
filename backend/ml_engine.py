@@ -308,6 +308,16 @@ class SurgePredictor:
         with cls._lock:
             cls._instance = None
 
+    def clear_window(self) -> None:
+        """
+        Clear the in-memory rolling feature window only.
+
+        Preserves the loaded model, calibrator, and locked thresholds.
+        Unlike reset(), this does not unload the singleton or artifacts.
+        """
+        with self._inference_lock:
+            self._window.clear()
+
     def push_tick(self, tick: ObservationTick) -> None:
         """Add an observation to the rolling window (without running inference)."""
         with self._inference_lock:
