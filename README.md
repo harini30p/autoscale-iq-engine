@@ -2,7 +2,15 @@
 
 AutoScale IQ is a student project for demonstrating telemetry-driven application optimization decisions. It ingests application metrics, uses a machine-learning model to estimate potential high-load risk, applies controller-gated configuration changes, records subsequent telemetry and event snapshots, and restores the default configuration when conditions recover.
 
-It is a local demonstration system, not a cloud or infrastructure autoscaler. It does not deploy or scale virtual machines, containers, or cloud services.
+It is a deployed demonstration system, not a cloud or infrastructure autoscaler. It does not deploy or scale virtual machines, containers, or cloud services.
+
+## Deployment
+
+- **Frontend:** Deployed on Vercel at [https://autoscale-iq-engine.vercel.app/](https://autoscale-iq-engine.vercel.app/).
+- **FastAPI backend:** Deployed on Render at [https://autoscale-iq-backend.onrender.com](https://autoscale-iq-backend.onrender.com/).
+- **Swagger API documentation:** [https://autoscale-iq-backend.onrender.com/docs](https://autoscale-iq-backend.onrender.com/docs).
+
+This deployment is a demonstration of the self-optimizing web application workflow. Demo telemetry and scenarios are controlled simulated telemetry; the ML model was trained using the real Azure Functions 2019 dataset. The optimization layer changes simulated, persisted configuration only—it is not connected to actual cloud infrastructure autoscaling or a production application's serving behavior.
 
 ## Architecture
 
