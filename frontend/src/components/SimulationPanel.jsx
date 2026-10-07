@@ -9,6 +9,7 @@ import {
   getSimulationScenario,
   getSimulationScenarios,
   resetSimulation,
+  setManualOverride,
   sendMonitorMetric,
 } from '../services/api';
 
@@ -35,6 +36,21 @@ const STATUS_LABELS = {
 };
 
 const DEFAULT_SCENARIO = 'gradual_surge';
+
+const DEMO_FLOWS = {
+  gradual_surge: {
+    label: 'Flow 1 — Traffic surge to optimization',
+    description: 'Rising traffic is evaluated by the ML model; the controller waits for required critical confirmations before applying its levers.',
+  },
+  recovery: {
+    label: 'Flow 2 — Recovery to normal',
+    description: 'The scenario first drives the live controller into optimization, then feeds normal recovery metrics until defaults are restored.',
+  },
+  hard_safety: {
+    label: 'Flow 3 — Safety block',
+    description: 'CPU and memory cross hard safety thresholds. Enable manual override before playback to prove optimization is blocked.',
+  },
+};
 
 function formatScenarioName(name) {
   if (!name) return '';
@@ -68,6 +84,8 @@ export default function SimulationPanel({
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [playBusy, setPlayBusy] = useState(false);
   const [error, setError] = useState(null);
+  const [manualOverrideForRun, setManualOverrideForRun] = useState(false);
+  const [lastMonitorResult, setLastMonitorResult] = useState(null);
 
   const sessionRef = useRef(0);
   const statusRef = useRef(STATUS.READY);
@@ -202,6 +220,7 @@ export default function SimulationPanel({
 
         if (session !== sessionRef.current) return;
 
+        setLastMonitorResult(monitorRes);
         tickIndexRef.current = idx + 1;
         setTickIndex(idx + 1);
 
@@ -254,8 +273,12 @@ export default function SimulationPanel({
     if (needsFreshStart) {
       try {
         await resetSimulation();
+        setLastMonitorResult(null);
+        if (selectedName === 'hard_safety' && manualOverrideForRun) {
+          await setManualOverride(true);
+        }
       } catch (err) {
-        setError(`Simulation reset failed: ${err.message}`);
+        setError(`Simulation preparation failed: ${err.message}`);
         setPlaybackStatus(STATUS.STOPPED);
         playLockRef.current = false;
         setPlayBusy(false);
@@ -302,9 +325,24 @@ export default function SimulationPanel({
     bumpSession();
     tickIndexRef.current = 0;
     setTickIndex(0);
+    setLastMonitorResult(null);
+    setManualOverrideForRun(false);
     setPlaybackStatus(STATUS.READY);
     setSelectedName(next);
   };
+
+  const demoFlow = DEMO_FLOWS[selectedName];
+  const runtimeState = lastMonitorResult?.controller_state?.toLowerCase();
+  const runtimeSummary = lastMonitorResult?.manual_override
+    && lastMonitorResult?.optimization_blocked_reason
+    ? 'Automatic optimization blocked by manual override'
+    : lastMonitorResult?.optimization_applied
+      ? 'Controller applied optimization on this tick'
+      : lastMonitorResult?.controller_state === 'RECOVERY'
+        ? `Recovery confirmation ${lastMonitorResult.consecutive_normal}/3`
+        : lastMonitorResult?.controller_state === 'WATCHING'
+          ? `Watching — ${lastMonitorResult.consecutive_high_risk}/3 critical confirmations`
+          : lastMonitorResult?.controller_state || '';
 
   return (
     <section className={`card sim-panel ${isRunning ? 'sim-panel-running' : ''}`}>
@@ -367,6 +405,53 @@ export default function SimulationPanel({
           ? 'Loading scenario ticks…'
           : (scenarioDetail?.description || 'Select a scenario to load tick metadata from the backend.')}
       </p>
+
+      {demoFlow && (
+        <div className={`sim-demo-callout sim-demo-${selectedName}`}>
+          <strong>{demoFlow.label}</strong>
+          <span>{demoFlow.description}</span>
+          {selectedName === 'hard_safety' && (
+            <label className="sim-safety-toggle">
+              <input
+                type="checkbox"
+                checked={manualOverrideForRun}
+                onChange={(event) => setManualOverrideForRun(event.target.checked)}
+                disabled={
+                  !backendConnected
+                  || isRunning
+                  || playBusy
+                  || loadingDetail
+                  || loadingList
+                  || status === STATUS.PAUSED
+                }
+              />
+              Start with the existing manual override enabled
+            </label>
+          )}
+        </div>
+      )}
+
+      {lastMonitorResult && (
+        <div
+          className={`sim-runtime-result sim-runtime-${runtimeState || 'normal'} ${
+            lastMonitorResult.manual_override && lastMonitorResult.optimization_blocked_reason
+              ? 'sim-runtime-blocked'
+              : ''
+          }`}
+          role="status"
+          aria-live="polite"
+        >
+          <strong>{runtimeSummary}</strong>
+          <span>
+            ML risk: {lastMonitorResult.risk_signal}
+            {' · '}
+            Controller: {lastMonitorResult.controller_state}
+          </span>
+          {lastMonitorResult.optimization_blocked_reason && (
+            <span>{lastMonitorResult.optimization_blocked_reason}</span>
+          )}
+        </div>
+      )}
 
       <div className="sim-progress-row">
         <div className="sim-progress-meta">

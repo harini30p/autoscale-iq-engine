@@ -18,6 +18,8 @@ from fastapi.testclient import TestClient
 from backend.config import (
     CACHE_NORMAL,
     CACHE_OPTIMIZED,
+    CPU_CRITICAL_THRESHOLD,
+    MEMORY_CRITICAL_THRESHOLD,
     PAGINATION_NORMAL,
     PAGINATION_OPTIMIZED,
     HEAVY_COMPONENTS_NORMAL,
@@ -442,3 +444,157 @@ def test_full_runtime_simulation_lifecycle(test_app_and_client):
     actions = [e["action"] for e in events]
     assert "apply_optimizations" in actions
     assert "restore_defaults" in actions
+
+
+def _post_simulation_tick(client, tick):
+    metric = {
+        **tick["metric"],
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    response = client.post("/monitor", json={"metric": metric})
+    assert response.status_code == 200, response.text
+    return response.json(), metric
+
+
+def test_milestone5_gradual_surge_optimizes_via_real_ml_and_monitor(test_app_and_client):
+    _, client, db_file = test_app_and_client
+    reset = client.post("/simulation/reset")
+    assert reset.status_code == 200
+
+    scenario = client.get("/simulation/scenarios/gradual_surge").json()
+    assert scenario["phases"] == ["warmup", "ramp", "surge", "recovery"]
+    assert scenario["warmup_tick_count"] == 61
+    ramp_ticks = [tick for tick in scenario["ticks"] if tick["phase"] == "ramp"]
+    traffic = [tick["metric"]["traffic"] for tick in ramp_ticks]
+    assert traffic == sorted(traffic)
+    assert traffic[-1] > traffic[0]
+
+    observed = []
+    optimized_response = None
+    for tick in scenario["ticks"]:
+        result, metric = _post_simulation_tick(client, tick)
+        observed.append((tick, result, metric))
+        if result["optimization_applied"]:
+            optimized_response = result
+            next_tick = scenario["ticks"][tick["index"] + 1]
+            after_response, _ = _post_simulation_tick(client, next_tick)
+            observed.append((next_tick, after_response, next_tick["metric"]))
+            break
+
+    assert optimized_response is not None
+    first_warmup_result = observed[0][1]
+    assert first_warmup_result["controller_state"] == "NORMAL"
+    assert first_warmup_result["optimization_applied"] is False
+    non_warmup = [result for tick, result, _ in observed if tick["phase"] != "warmup"]
+    assert any(result["risk_signal"] == "elevated" for result in non_warmup)
+    critical_counts = [
+        result["consecutive_high_risk"]
+        for result in non_warmup
+        if result["risk_signal"] == "critical"
+    ]
+    assert 1 in critical_counts
+    assert 2 in critical_counts
+    assert optimized_response["risk_signal"] == "critical"
+    assert optimized_response["controller_state"] == "OPTIMIZED"
+    assert optimized_response["optimization_applied"] is True
+    assert optimized_response["current_configuration"]["caching"] == CACHE_OPTIMIZED
+    assert optimized_response["current_configuration"]["pagination_size"] == PAGINATION_OPTIMIZED
+    assert optimized_response["current_configuration"]["heavy_components"] == HEAVY_COMPONENTS_OPTIMIZED
+    assert all(result["ml_prediction"] is not None for _, result, _ in observed)
+
+    apply_event = next(
+        event
+        for event in get_recent_events(db_path=db_file)
+        if event["action"] == "apply_optimizations"
+    )
+    assert apply_event["before_metrics"] is not None
+    assert apply_event["after_metrics"] is not None
+    assert apply_event["impact"] is not None
+    assert apply_event["impact"]["response_time"] is not None
+    optimization_index = next(
+        i for i, (_, result, _) in enumerate(observed)
+        if result["optimization_applied"]
+    )
+    before_metric = observed[optimization_index][2]
+    after_metric = observed[optimization_index + 1][2]
+    assert apply_event["before_metrics"]["traffic"] == before_metric["traffic"]
+    assert apply_event["after_metrics"]["traffic"] == after_metric["traffic"]
+    assert apply_event["before_metrics"]["response_time"] != apply_event["after_metrics"]["response_time"]
+    assert apply_event["impact"]["response_time"] != 0
+
+
+def test_milestone5_recovery_scenario_restores_defaults_via_monitor(test_app_and_client):
+    _, client, db_file = test_app_and_client
+    reset = client.post("/simulation/reset")
+    assert reset.status_code == 200
+
+    scenario = client.get("/simulation/scenarios/recovery").json()
+    observed = []
+    for tick in scenario["ticks"]:
+        result, metric = _post_simulation_tick(client, tick)
+        observed.append((tick, result, metric))
+
+    recovery_ticks = [
+        (tick, result, metric)
+        for tick, result, metric in observed
+        if tick["phase"] == "recovery"
+    ]
+    assert recovery_ticks
+    assert all(metric["traffic"] < 600 for _, _, metric in recovery_ticks)
+
+    applied_indices = [
+        i for i, (_, result, _) in enumerate(observed)
+        if result["optimization_applied"]
+    ]
+    assert applied_indices
+    assert any(
+        result["controller_state"] == "OPTIMIZED"
+        and result["current_configuration"]["caching"] == CACHE_OPTIMIZED
+        for _, result, _ in observed
+    )
+    optimized_index = applied_indices[0]
+    recovery_observations = observed[optimized_index + 1:]
+    recovery_states = [result["controller_state"] for _, result, _ in recovery_observations]
+    assert "RECOVERY" in recovery_states
+    assert "NORMAL" in recovery_states
+    assert any(
+        result["consecutive_normal"] in (1, 2)
+        for _, result, _ in recovery_observations
+        if result["controller_state"] == "RECOVERY"
+    )
+
+    final_result = recovery_observations[-1][1]
+    assert final_result["controller_state"] == "NORMAL"
+    assert final_result["current_configuration"]["caching"] == CACHE_NORMAL
+    assert final_result["current_configuration"]["pagination_size"] == PAGINATION_NORMAL
+    assert final_result["current_configuration"]["heavy_components"] == HEAVY_COMPONENTS_NORMAL
+
+    actions = [event["action"] for event in get_recent_events(db_path=db_file)]
+    assert "apply_optimizations" in actions
+    assert "restore_defaults" in actions
+
+
+def test_milestone5_manual_override_blocks_hard_safety_scenario(test_app_and_client):
+    _, client, _ = test_app_and_client
+    reset = client.post("/simulation/reset")
+    assert reset.status_code == 200
+
+    override = client.post("/override", json={"manual_override": True})
+    assert override.status_code == 200
+    assert override.json()["manual_override"] is True
+
+    scenario = client.get("/simulation/scenarios/hard_safety").json()
+    hard_tick = next(tick for tick in scenario["ticks"] if tick["phase"] == "hard_safety")
+    result, metric = _post_simulation_tick(client, hard_tick)
+
+    assert metric["cpu_utilization"] >= CPU_CRITICAL_THRESHOLD
+    assert metric["memory_utilization"] >= MEMORY_CRITICAL_THRESHOLD
+    assert result["ml_prediction"] is not None
+    assert result["stale"] is False
+    assert result["manual_override"] is True
+    assert result["controller_state"] == "NORMAL"
+    assert result["optimization_applied"] is False
+    assert "manual override" in result["optimization_blocked_reason"].lower()
+    assert result["current_configuration"]["caching"] == CACHE_NORMAL
+    assert result["current_configuration"]["pagination_size"] == PAGINATION_NORMAL
+    assert result["current_configuration"]["heavy_components"] == HEAVY_COMPONENTS_NORMAL

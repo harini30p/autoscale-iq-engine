@@ -745,6 +745,75 @@
   margin: 0;
 }
 
+.sim-demo-callout,
+.sim-runtime-result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  border: 1px solid var(--border-card);
+  border-radius: var(--radius-sm);
+  padding: 0.65rem 0.75rem;
+  font-size: 0.78rem;
+}
+
+.sim-demo-callout {
+  background: rgba(37, 99, 235, 0.08);
+  color: var(--text-secondary);
+}
+
+.sim-demo-callout strong,
+.sim-runtime-result strong {
+  color: var(--text-primary);
+}
+
+.sim-demo-hard_safety {
+  border-color: var(--color-critical-border);
+  background: var(--color-critical-bg);
+}
+
+.sim-safety-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  margin-top: 0.3rem;
+  color: var(--text-primary);
+  cursor: pointer;
+}
+
+.sim-safety-toggle input {
+  margin-top: 0.15rem;
+  accent-color: #f87171;
+}
+
+.sim-safety-toggle input:disabled {
+  cursor: not-allowed;
+}
+
+.sim-runtime-result {
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--text-secondary);
+}
+
+.sim-runtime-watching {
+  border-color: var(--color-watching-border);
+  background: var(--color-watching-bg);
+}
+
+.sim-runtime-optimized {
+  border-color: var(--color-optimized-border);
+  background: var(--color-optimized-bg);
+}
+
+.sim-runtime-recovery {
+  border-color: var(--color-normal-border);
+  background: var(--color-normal-bg);
+}
+
+.sim-runtime-blocked {
+  border-color: var(--color-critical-border);
+  background: var(--color-critical-bg);
+}
+
 .sim-progress-row {
   display: flex;
   flex-direction: column;
@@ -1697,4 +1766,3 @@
     grid-template-columns: 1fr;
   }
 }
-

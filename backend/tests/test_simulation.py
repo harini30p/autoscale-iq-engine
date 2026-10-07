@@ -125,7 +125,7 @@ def test_scenario_phases_are_deterministic_and_ordered():
         "gradual_surge": [PHASE_WARMUP, PHASE_RAMP, PHASE_SURGE, "recovery"],
         "sudden_spike": [PHASE_WARMUP, PHASE_SPIKE, "recovery"],
         "hard_safety": [PHASE_WARMUP, PHASE_HARD_SAFETY, "recovery"],
-        "recovery": [PHASE_WARMUP, PHASE_SURGE, "recovery"],
+        "recovery": [PHASE_WARMUP, PHASE_RAMP, PHASE_SURGE, "recovery"],
     }
     for name, phases in expected_phases.items():
         scenario = get_scenario(name)
@@ -381,4 +381,3 @@ def test_get_unknown_simulation_scenario_returns_404(tmp_path):
     with TestClient(app) as client:
         response = client.get("/simulation/scenarios/not_a_real_scenario")
         assert response.status_code == 404
-

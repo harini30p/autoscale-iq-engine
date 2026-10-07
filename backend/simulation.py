@@ -51,7 +51,7 @@ _BASE = {
 
 # Elevated load below hard-safety thresholds — suitable for ML/controller demos
 _SURGE = {
-    "traffic": 550.0,
+    "traffic": 600.0,
     "active_users": 120,
     "cpu_utilization": 72.0,
     "memory_utilization": 65.0,
@@ -210,6 +210,17 @@ def _repeat_phase(phase: str, profile: Mapping[str, Any], count: int) -> List[Tu
     return [(phase, metric) for _ in range(count)]
 
 
+def _ramp_phase(
+    start: Mapping[str, Any],
+    end: Mapping[str, Any],
+    count: int,
+) -> List[Tuple[str, Dict[str, Any]]]:
+    return [
+        (PHASE_RAMP, _lerp(start, end, (i + 1) / count))
+        for i in range(count)
+    ]
+
+
 def _assemble(name: str, description: str, sequenced: Sequence[Tuple[str, Dict[str, Any]]]) -> ScenarioDefinition:
     ticks = tuple(
         SimulationTick(index=i, phase=phase, metric=metric)
@@ -231,11 +242,7 @@ def _build_baseline() -> ScenarioDefinition:
 
 
 def _build_gradual_surge() -> ScenarioDefinition:
-    ramp_len = 20
-    ramp = [
-        (PHASE_RAMP, _lerp(_BASE, _SURGE, (i + 1) / ramp_len))
-        for i in range(ramp_len)
-    ]
+    ramp = _ramp_phase(_BASE, _SURGE, 12)
     sequenced = (
         _repeat_phase(PHASE_WARMUP, _BASE, WARMUP_TICK_COUNT)
         + ramp
@@ -244,7 +251,7 @@ def _build_gradual_surge() -> ScenarioDefinition:
     )
     return _assemble(
         SCENARIO_GRADUAL_SURGE,
-        "Warmup, linear ramp into a sustained surge, then cooling recovery ticks.",
+        "Flow 1: warmup and rising traffic drive ML risk through controller confirmations into optimization, followed by cooling ticks.",
         sequenced,
     )
 
@@ -270,20 +277,22 @@ def _build_hard_safety() -> ScenarioDefinition:
     )
     return _assemble(
         SCENARIO_HARD_SAFETY,
-        "Warmup then CPU/memory at or above hard safety thresholds, then cooling ticks.",
+        "Flow 3: warmup then CPU/memory hard-threshold breaches; enable manual override in the panel to demonstrate blocked automation.",
         sequenced,
     )
 
 
 def _build_recovery() -> ScenarioDefinition:
+    ramp = _ramp_phase(_BASE, _SURGE, 12)
     sequenced = (
         _repeat_phase(PHASE_WARMUP, _BASE, WARMUP_TICK_COUNT)
-        + _repeat_phase(PHASE_SURGE, _SURGE, 6)
+        + ramp
+        + _repeat_phase(PHASE_SURGE, _SURGE, 10)
         + _repeat_phase(PHASE_RECOVERY, _RECOVERY, 20)
     )
     return _assemble(
         SCENARIO_RECOVERY,
-        "Warmup and a short surge, then an extended run of recovery-profile ticks.",
+        "Flow 2: rising traffic establishes optimized state, then normal recovery ticks pass through the controller until defaults are restored.",
         sequenced,
     )
 
