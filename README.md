@@ -164,15 +164,6 @@ frontend/             React dashboard and Vite tooling
 ml/                   Offline ML pipeline, documentation, and locked runtime artifacts
 ```
 
-## Project status
-
-- Milestones 1–3: **Complete**
-- Milestone 4 — Interactive Simulation: **Complete**
-- Milestone 5 — Demo/Safety Polish: **Complete**
-- Milestone 6 — Final NEXUS Preparation: **In progress**
-
-The current milestone focuses on documentation, demo preparation, final validation, and repository readiness; it does not introduce a new ML model or cloud autoscaling architecture.
-
 ## Demo runbook
 
 Start the backend and frontend, then use the dashboard's interactive simulation or the simulation API. Reset the controller and levers between flows when needed with `POST /simulation/reset`; this retains history.
